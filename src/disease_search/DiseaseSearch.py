@@ -3,12 +3,13 @@ import re
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkinter.font import Font
+from bs4 import BeautifulSoup
 
 
 class DiseaseGeneApp:
     def __init__(self, root):
         self.root = root
-        root.title("KEGG Disease Gene Explorer")
+        root.title("KEGG Disease Gene Drug Explorer")
         root.geometry("1200x800")
 
         # Configure styles
@@ -112,7 +113,7 @@ class DiseaseGeneApp:
         self.description_text.pack(fill=tk.X, padx=5, pady=5)
         self.description_text.config(state=tk.DISABLED)
 
-        # Create notebook for pathways and genes
+        # Create notebook for pathways, genes, and drugs
         details_notebook = ttk.Notebook(self.disease_details_frame)
         details_notebook.pack(fill=tk.BOTH, expand=True, pady=5)
 
@@ -156,6 +157,26 @@ class DiseaseGeneApp:
 
         self.genes_tree.pack(side="left", fill="both", expand=True)
         genes_scrollbar.pack(side="right", fill="y")
+
+        # Drugs tab (new)
+        drugs_frame = ttk.Frame(details_notebook)
+        details_notebook.add(drugs_frame, text="Drugs")
+
+        # Drugs treeview with updated columns
+        self.drugs_tree = ttk.Treeview(drugs_frame,
+                                       columns=('id', 'name'),
+                                       show='headings')
+        self.drugs_tree.heading('id', text='Drug ID')
+        self.drugs_tree.heading('name', text='Drug Name')
+
+        self.drugs_tree.column('id', width=100)
+        self.drugs_tree.column('name', width=200)
+
+        drugs_scrollbar = ttk.Scrollbar(drugs_frame, orient="vertical", command=self.drugs_tree.yview)
+        self.drugs_tree.configure(yscrollcommand=drugs_scrollbar.set)
+
+        self.drugs_tree.pack(side="left", fill="both", expand=True)
+        drugs_scrollbar.pack(side="right", fill="y")
 
         # Status bar
         self.status_var = tk.StringVar()
@@ -249,6 +270,10 @@ class DiseaseGeneApp:
             # Update the UI with disease details
             self.update_disease_details_ui(disease_data)
 
+            # Fetch and display drug information
+            disease_name = disease_data["name"]
+            self.fetch_drug_info(disease_name, disease_id)
+
             # Switch to the details tab
             self.notebook.select(1)  # Select the disease details tab
             self.status_var.set(f"Loaded details for {disease_id}")
@@ -284,6 +309,73 @@ class DiseaseGeneApp:
                 f"HSA:{gene['hsa']}" if gene['hsa'] else "",
                 f"KO:{gene['ko']}" if gene['ko'] else ""
             ))
+
+    def fetch_drug_info(self, disease_name, disease_id):
+        """Fetch drug information for a disease from KEGG"""
+        self.status_var.set(f"Fetching drug information for {disease_name}...")
+        self.root.update()
+
+        try:
+            # Clear previous drug results
+            self.drugs_tree.delete(*self.drugs_tree.get_children())
+
+            # Construct the drug search URL
+            search_url = f"https://www.kegg.jp/kegg-bin/search?from=disease&q={disease_name.replace(' ', '+')}&display=drug&search_gene=1&target=compound%2bdrug%2bdgroup%2bdisease"
+            response = requests.get(search_url)
+
+            if response.status_code != 200:
+                self.status_var.set(f"Failed to fetch drug information (Status: {response.status_code})")
+                return
+
+            drugs = self.parse_drugs_from_html(response.text, disease_name, disease_id)
+
+            for drug in drugs:
+                self.drugs_tree.insert('', 'end', values=(drug["drug_id"], drug["name"]))
+
+            self.status_var.set(f"Found {len(drugs)} drugs for {disease_name}")
+
+        except Exception as e:
+            self.status_var.set(f"Error fetching drug information: {str(e)}")
+            print(f"Drug fetch error: {str(e)}")
+
+    def parse_drugs_from_html(self, html_text, disease_name, disease_id):
+        """Parse drug info from KEGG drug search HTML result"""
+        soup = BeautifulSoup(html_text, 'html.parser')
+        drug_table = soup.find("table", class_="list1")
+        if not drug_table:
+            return []
+
+        target_disease_ids = [disease_id]
+        if ":" not in disease_id:
+            target_disease_ids.append(f"DS:{disease_id}")
+
+        drugs = []
+        rows = drug_table.find_all("tr")[1:]  # Skip header row
+
+        for row in rows:
+            try:
+                cols = row.find_all("td")
+                if len(cols) < 4:
+                    continue
+
+                drug_id = cols[0].text.strip()
+                drug_name = cols[1].text.strip()
+
+                # Optional: Parse the diseases column to make sure it's linked to our disease
+                diseases_text = cols[3].text.strip()
+                matched = any(disease_name.lower() in diseases_text.lower() or t_id in diseases_text for t_id in
+                              target_disease_ids)
+
+                if matched:
+                    drugs.append({
+                        "drug_id": drug_id,
+                        "name": drug_name
+                    })
+
+            except Exception as e:
+                print(f"Error parsing row: {e}")
+
+        return drugs
 
     def get_kegg_disease(self, disease_id):
         """
