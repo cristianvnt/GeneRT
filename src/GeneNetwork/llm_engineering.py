@@ -1,31 +1,32 @@
 import json
+import re
 from typing import List
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from transformers import BitsAndBytesConfig
 
-# Quantization configuration for memory efficiency
-quant_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_use_double_quant=True,
-    bnb_4bit_compute_dtype=torch.bfloat16,
-    bnb_4bit_quant_type="nf4"
-)
+# Global model pipeline to avoid reinitializing
+global_pipe = None
 
 
 def initialize_qwen():
-    """Initialize Qwen model with quantization"""
-    model_id = "Qwen/Qwen2.5-Omni-7B"
+    """Initialize Qwen model without quantization"""
+    global global_pipe
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        device_map="auto",
-        quantization_config=quant_config,
-        torch_dtype=torch.bfloat16
-    )
+    if global_pipe is None:
+        print("Initializing Qwen model...")
+        # Use a smaller model that can fit in CPU memory
+        model_id = "Qwen/Qwen2.5-Omni-7B"
 
-    return pipeline("text-generation", model=model, tokenizer=tokenizer)
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            device_map="auto",
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+        )
+
+        global_pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
+
+    return global_pipe
 
 
 def create_entry_prompt(entry_lines: List[str], gene_id: str) -> str:
@@ -48,36 +49,19 @@ def create_entry_prompt(entry_lines: List[str], gene_id: str) -> str:
     '''
 
 
-def find_gene_entries(entries: List[str], gene_id: str) -> dict:
-    """Find all entries for a specific gene"""
-    # Initialize Qwen pipeline
+def find_gene_entries(entries: List[str], gene_id: str) -> List[str]:
+    """Find all entries for a specific gene using regex pattern matching"""
 
+    print(f"Searching for gene hsa:{gene_id} in {len(entries)} entries...")
+    result_ids = []
+    search_pattern = rf'name="[^"]*hsa:{gene_id}[^"]*"'
 
-    qwen_pipe = initialize_qwen()
+    for entry in entries:
+        if re.search(search_pattern, entry):
+            # Extract ID from entry line
+            match = re.search(r'id="([^"]+)"', entry)
+            if match:
+                entry_id = match.group(1)
+                result_ids.append(entry_id)
 
-    # Create chunks if KGML is too large
-    # entry_lines = [line for line in kgml_text.split('\n') if '<entry' in line]
-    # chunk_size = 20  # Process 20 entries at a time
-    # results = []
-
-    prompt = create_entry_prompt(entries, gene_id)
-
-        # Generate response
-    response = qwen_pipe(
-        prompt,
-        max_new_tokens=200,
-        temperature=0.1,  # Lower for more deterministic results
-        do_sample=False
-        )
-
-    try:
-        # Extract JSON from response
-        json_str = response[0]['generated_text'].split('{', 1)[-1]
-        json_str = '{' + json_str.rsplit('}', 1)[0] + '}'
-    except Exception as e:
-        print(f"Error parsing response: {e}")
-
-    # Combine results from all chunks
-
-
-    return json.loads(json_str)
+    return result_ids

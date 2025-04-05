@@ -1,5 +1,7 @@
 from ph import *
 import llm_engineering
+
+
 def main():
     try:
         gene_id = 7157
@@ -17,21 +19,24 @@ def main():
         kgml = kgmls[i]
 
         sections = KGMLGeneInteractionUtils.extract_entry_and_relation_blocks(kgml)
-        print("[ENTRY LINES]")
-        for entry in sections.entry_lines:
+        print(f"Found {len(sections.entry_lines)} entries and {len(sections.relation_lines)} relations")
+
+        print("[ENTRY LINES SAMPLE (first 3)]")
+        for entry in sections.entry_lines[:3]:  # Show only first 3 to avoid cluttering output
             print(entry)
 
-        print("\n[RELATION LINES]")
-        for rel in sections.relation_lines:
+        print("\n[RELATION LINES SAMPLE (first 3)]")
+        for rel in sections.relation_lines[:3]:  # Show only first 3 to avoid cluttering output
             print(rel)
 
-        print("finish")
-
+        print("\nSearching for entries with gene ID 7157...")
         entry_ids = llm_engineering.find_gene_entries(sections.entry_lines, "7157")
         print("Matching entry IDs:", entry_ids)
 
     except Exception as e:
-        print("An error occurred:", str(e))
+        import traceback
+        print("An error occurred:")
+        print(traceback.format_exc())  # This will print the full stack trace
 
 
 if __name__ == "__main__":
