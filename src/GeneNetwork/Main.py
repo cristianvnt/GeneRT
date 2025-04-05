@@ -27,7 +27,7 @@ def main():
 
         print("finish")
 
-        entry_ids = llm_engineering.ask_gemma_for_all_entry_ids(sections.entry_lines, "7157")
+        entry_ids = llm_engineering.find_gene_entries(sections.entry_lines, "7157")
         print("Matching entry IDs:", entry_ids)
 
     except Exception as e:
