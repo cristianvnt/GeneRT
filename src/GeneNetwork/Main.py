@@ -4,7 +4,7 @@ import llm_engineering
 
 def main():
     try:
-        gene_id = 7157
+        gene_id = 8647
         gene_kegg_id = f"hsa:{gene_id}"
         print(f"Analyzing gene {gene_kegg_id}")
 
@@ -29,8 +29,8 @@ def main():
         for rel in sections.relation_lines[:3]:  # Show only first 3 to avoid cluttering output
             print(rel)
 
-        print("\nSearching for entries with gene ID 7157...")
-        entry_ids = llm_engineering.find_gene_entries(sections.entry_lines, "7157")
+        print(f"\nSearching for entries with gene ID {gene_id}...")
+        entry_ids = llm_engineering.find_gene_entries(sections.entry_lines,  gene_id)
         print("Matching entry IDs:", entry_ids)
 
     except Exception as e:
