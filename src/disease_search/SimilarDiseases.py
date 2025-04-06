@@ -8,12 +8,17 @@ from functools import lru_cache
 import threading
 from queue import Queue
 
+from bs4 import BeautifulSoup
+
 
 class DiseaseGeneApp:
     def __init__(self, root):
         self.root = root
-        root.title("KEGG Disease Pathway Explorer")
-        root.geometry("1200x800")
+        frame = tk.Frame(root, bg="lightgreen")
+        frame.pack(fill="both", expand=True)
+
+        label = tk.Label(frame, text="Similar Diseases Component", bg="lightgreen", font=("Arial", 14))
+        label.pack(pady=20)
 
         # Configuration - Default Settings
         self.max_diseases_to_check = 200  # Limit number of diseases to check
@@ -492,17 +497,105 @@ class DiseaseGeneApp:
             self.progress.pack_forget()
 
     def show_results(self, results):
-        self.results_tree.delete(*self.results_tree.get_children())
+        # Șterge orice rezultat anterior
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        # Scrolleable canvas
+        canvas = tk.Canvas(self.results_frame)
+        scrollbar = ttk.Scrollbar(self.results_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        self.status_var.set("Loading drugs for similar diseases...")
 
         for result in results:
-            self.results_tree.insert('', 'end', values=(
-                result['id'],
-                result['name'],
-                f"{result['score']:.2f}"
-            ))
+            disease_id = result['id']
+            disease_name = result['name']
+            score = result['score']
 
-        self.notebook.select(1)  # Switch to results tab
+            # Frame pentru boală
+            disease_frame = ttk.LabelFrame(scrollable_frame, text=f"{disease_name} (Similarity: {score:.2f})")
+            disease_frame.pack(fill="x", expand=True, padx=10, pady=5)
+
+            drug_label = ttk.Label(disease_frame, text="Drugs:")
+            drug_label.pack(side="left", padx=(10, 5))
+
+            drug_combo = ttk.Combobox(disease_frame, width=80)
+            drug_combo.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+            # Fetch medicamente pentru fiecare boală (thread separat)
+            threading.Thread(
+                target=lambda combo=drug_combo, dname=disease_name, did=disease_id: self.populate_drug_combobox(combo,
+                                                                                                                dname,
+                                                                                                                did),
+                daemon=True
+            ).start()
+
         self.status_var.set(f"Found {len(results)} similar diseases")
+        self.notebook.select(1)
+
+    def populate_drug_combobox(self, combobox, disease_name, disease_id):
+        try:
+            url = f"https://www.kegg.jp/kegg-bin/search?from=disease&q={disease_name.replace(' ', '+')}&display=drug&search_gene=1&target=compound%2bdrug%2bdgroup%2bdisease"
+            response = requests.get(url)
+
+            if response.status_code != 200:
+                return
+
+            html = response.text
+            soup = BeautifulSoup(html, 'html.parser')
+            drug_table = soup.find("table", class_="list1")
+
+            if not drug_table:
+                return
+
+            target_disease_ids = [disease_id]
+            if ":" not in disease_id:
+                target_disease_ids.append(f"DS:{disease_id}")
+
+            drugs = []
+            rows = drug_table.find_all("tr")[1:]
+
+            for row in rows:
+                try:
+                    cols = row.find_all("td")
+                    if len(cols) < 4:
+                        continue
+
+                    drug_id = cols[0].text.strip()
+                    drug_name = cols[1].text.strip()
+                    diseases_text = cols[3].text.strip()
+
+                    matched = any(disease_name.lower() in diseases_text.lower() or t_id in diseases_text for t_id in
+                                  target_disease_ids)
+
+                    if matched:
+                        drugs.append(f"{drug_id} - {drug_name}")
+                except:
+                    continue
+
+            if drugs:
+                combobox['values'] = drugs
+                combobox.set(drugs[0])
+            else:
+                combobox['values'] = ["No drugs found"]
+                combobox.set("No drugs found")
+
+        except Exception as e:
+            print(f"Error fetching drugs for {disease_name}: {e}")
+            combobox['values'] = ["Error fetching"]
+            combobox.set("Error fetching")
 
     def load_selected_disease(self, event):
         selected = self.results_tree.selection()

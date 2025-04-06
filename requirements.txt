@@ -1,2 +1,10 @@
 PyQt5~=5.15.11
 requests~=2.32.3
+beautifulsoup4~=4.13.3
+pandas~=2.2.3
+networkx~=3.4.2
+pyvis~=0.3.2
+pywebview~=5.4
+
+python-dotenv~=1.1.0
+accelerate~=1.6.0

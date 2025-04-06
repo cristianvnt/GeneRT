@@ -1,50 +1,49 @@
 import requests
 import json
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 from tkinter.font import Font
+import webbrowser
+
 import webview
 
+from src.geneInfoFetching.GeneGraph import GeneNetworkViewer
 
 class GeneInfoApp:
     def __init__(self, root):
         self.root = root
-        root.title("Gene Information Finder")
-        root.geometry("900x700")
 
-        self.title_font = Font(family='Helvetica', size=12, weight='bold')
-        self.header_font = Font(family='Helvetica', size=11, weight='bold')
+        self.title_font = Font(family='Helvetica', size=14, weight='bold')
+        self.header_font = Font(family='Helvetica', size=12, weight='bold')
         self.normal_font = Font(family='Helvetica', size=10)
-
-        self.bg_color = "#f5f5f5"
-        self.section_bg = "#e8f4f8"
-        self.root.configure(bg=self.bg_color)
 
         self.create_widgets()
 
     def create_widgets(self):
-        main_frame = ttk.Frame(self.root, padding="10")
+        self.root.configure(bg=self.root["bg"])
+
+        main_frame = tk.Frame(self.root, bg=self.root["bg"], padx=30, pady=30)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        search_frame = ttk.Frame(main_frame)
-        search_frame.pack(fill=tk.X, pady=(0, 10))
+        search_frame = tk.Frame(main_frame, bg=self.root["bg"])
+        search_frame.pack(fill=tk.X, pady=(0, 20))
 
-        ttk.Label(search_frame, text="Enter Human Gene Name:", font=self.normal_font).pack(side=tk.LEFT)
+        tk.Label(search_frame, text="Enter Human Gene Name:", font=self.normal_font, bg=self.root["bg"]).pack(side=tk.LEFT)
 
-        self.gene_entry = ttk.Entry(search_frame, width=30, font=self.normal_font)
+        self.gene_entry = tk.Entry(search_frame, width=30, font=self.normal_font, bg="white")
         self.gene_entry.pack(side=tk.LEFT, padx=10)
         self.gene_entry.bind('<Return>', lambda event: self.fetch_gene_info())
         self.gene_entry.focus_set()
 
-        search_btn = ttk.Button(search_frame, text="Search", command=self.fetch_gene_info)
+        search_btn = tk.Button(search_frame, text="Search", command=self.fetch_gene_info)
         search_btn.pack(side=tk.LEFT)
 
-        results_frame = ttk.Frame(main_frame)
+        results_frame = tk.Frame(main_frame, bg=self.root["bg"])
         results_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(results_frame, bg=self.bg_color, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(results_frame, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = ttk.Frame(self.canvas)
+        self.canvas = tk.Canvas(results_frame, bg=self.root["bg"], highlightthickness=0)
+        scrollbar = tk.Scrollbar(results_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=self.root["bg"], padx=20, pady=10)
 
         self.scrollable_frame.bind(
             "<Configure>",
@@ -57,17 +56,10 @@ class GeneInfoApp:
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self.status_var = tk.StringVar()
-        self.status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN)
-        self.status_bar.pack(fill=tk.X)
-
     def fetch_gene_info(self):
         gene_name = self.gene_entry.get().strip().upper()
         if not gene_name:
             return
-
-        self.status_var.set(f"Searching for {gene_name}...")
-        self.root.update_idletasks()
 
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
@@ -79,7 +71,6 @@ class GeneInfoApp:
 
             if not search_json["esearchresult"]["idlist"]:
                 messagebox.showerror("Error", f"No human gene found with name: {gene_name}")
-                self.status_var.set("Ready")
                 return
 
             gene_id = search_json["esearchresult"]["idlist"][0]
@@ -99,108 +90,61 @@ class GeneInfoApp:
             ncbi_name = gene_data.get("description", "N/A")
             ncbi_function = gene_data.get("summary", "N/A")
 
-            row = 0
+            self.add_section("Gene Information: {}".format(gene_name), [
+                f"NCBI Gene ID: {gene_id}",
+                f"KEGG ID: {kegg_gene_id}"
+            ])
 
-            header_frame = ttk.Frame(self.scrollable_frame, padding=(10, 5), relief=tk.RAISED, borderwidth=1)
-            header_frame.grid(row=row, column=0, sticky="ew", pady=(0, 10))
-            ttk.Label(header_frame, text=f"GENE INFORMATION: {gene_name}", font=self.title_font).pack()
-            row += 1
-
-            info_frame = ttk.Frame(self.scrollable_frame, padding=(10, 5))
-            info_frame.grid(row=row, column=0, sticky="ew")
-            ttk.Label(info_frame, text=f"NCBI Gene ID: {gene_id}", font=self.normal_font).grid(row=0, column=0, sticky="w")
-            ttk.Label(info_frame, text=f"KEGG ID: {kegg_gene_id}", font=self.normal_font).grid(row=1, column=0, sticky="w", pady=(5, 0))
-            row += 1
-
-            full_name = self.get_full_name(kegg_data, ncbi_name)
-            name_frame = ttk.LabelFrame(self.scrollable_frame, text="Full Name", padding=10)
-            name_frame.grid(row=row, column=0, sticky="ew", pady=(10, 0))
-            ttk.Label(name_frame, text=full_name, font=self.normal_font, wraplength=800).pack(anchor="w")
-            row += 1
-
-            func_frame = ttk.LabelFrame(self.scrollable_frame, text="Biological Function", padding=10)
-            func_frame.grid(row=row, column=0, sticky="ew", pady=(10, 0))
-            ttk.Label(func_frame, text=ncbi_function, font=self.normal_font, wraplength=800).pack(anchor="w")
-            row += 1
+            self.add_section("Description", [
+                f"Full Name: {self.get_full_name(kegg_data, ncbi_name)}",
+                f"Function: {ncbi_function}"
+            ])
 
             if 'ORTHOLOGY' in kegg_data:
-                ortho_frame = ttk.LabelFrame(self.scrollable_frame, text="Orthology", padding=10)
-                ortho_frame.grid(row=row, column=0, sticky="ew", pady=(10, 0))
+                ortho_text = kegg_data['ORTHOLOGY']
+                section_widgets = [ortho_text]
 
-                orthology_text = kegg_data['ORTHOLOGY']
-                orthology_trimmed = orthology_text[7:] if len(orthology_text) > 7 else ""
-                ttk.Label(ortho_frame, text=orthology_text, font=self.normal_font, wraplength=800).pack(anchor="w")
-
-                pdb_code = self.cauta_proteina(orthology_trimmed)
+                protein_name = ortho_text[7:] if len(ortho_text) > 7 else ""
+                pdb_code = self.cauta_proteina(protein_name)
                 if pdb_code != "N/A":
-                    def show_embedded_structure():
-                        url = f"https://www.rcsb.org/3d-view/{pdb_code}"
-                        webview.create_window(f"3D Structure Viewer: {pdb_code}", url, width=900, height=700)
-                        webview.start()
+                    section_widgets.append(f"3D Structure: {pdb_code}")
 
-                    ttk.Label(ortho_frame, text=f"PDB Code: {pdb_code}", font=self.normal_font, foreground="blue").pack(anchor="w", pady=(5, 0))
-                    ttk.Button(ortho_frame, text="View 3D Structure", command=show_embedded_structure).pack(anchor="w")
-                row += 1
+                section = self.add_section("Orthology", section_widgets)
+
+                if pdb_code != "N/A":
+                    btn = tk.Button(section, text=f"Open 3D Structure: {pdb_code}", font=self.normal_font, command=lambda: self.show_embedded_structure(pdb_code))
+                    btn.pack(anchor="w", padx=20, pady=(5, 10))
 
             if 'PATHWAY' in kegg_data:
-                path_frame = ttk.LabelFrame(self.scrollable_frame, text="Pathways", padding=10)
-                path_frame.grid(row=row, column=0, sticky="ew", pady=(10, 0))
-                pathways = kegg_data['PATHWAY']
-                if pathways != "N/A":
-                    pathways = pathways.split('hsa')
-                    for pathway in pathways[1:]:
-                        path_text = f"hsa{pathway.strip()}"
-                        ttk.Label(path_frame, text=path_text, font=self.normal_font).pack(anchor="w", pady=(0, 3))
-                row += 1
+                pathways = [f"- hsa{path.strip()}" for path in kegg_data['PATHWAY'].split('hsa')[1:]]
+                self.add_section("Pathways", pathways)
 
             if 'DISEASE' in kegg_data:
-                disease_frame = ttk.LabelFrame(self.scrollable_frame, text="Disease Associations", padding=10)
-                disease_frame.grid(row=row, column=0, sticky="ew", pady=(10, 0))
+                diseases = [f"- H{line.strip()}" if line.strip() and line.strip()[0].isdigit() else f"- {line.strip()}"
+                            for line in kegg_data['DISEASE'].split('H') if line.strip()]
+                self.add_section("Disease Associations", diseases)
 
-                diseases = kegg_data['DISEASE']
-                if diseases != "N/A":
-                    disease_list = [d.strip() for d in diseases.split('H') if d.strip()]
-                    for i, disease in enumerate(disease_list):
-                        disease_text = f"H{disease}" if i == 0 and not disease.startswith('0') else (
-                            f"H{disease}" if disease[0].isdigit() else disease)
-
-                        d_frame = ttk.Frame(disease_frame)
-                        d_frame.pack(fill=tk.X, pady=(0, 5))
-
-                        parts = disease_text.split('  ', 1)
-                        if len(parts) == 2:
-                            code, desc = parts
-                            ttk.Label(d_frame, text=code, font=self.normal_font, width=10).pack(side=tk.LEFT, anchor="w")
-                            ttk.Label(d_frame, text=desc, font=self.normal_font, wraplength=700).pack(side=tk.LEFT, anchor="w")
-                        else:
-                            ttk.Label(d_frame, text=disease_text, font=self.normal_font).pack(anchor="w")
-                row += 1
-
-            self.status_var.set(f"Found information for {gene_name}")
 
         except requests.exceptions.RequestException as e:
             messagebox.showerror("Network Error", f"Could not connect to services: {str(e)}")
-            self.status_var.set("Network error occurred")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
-            self.status_var.set("Error occurred")
 
         self.scrollable_frame.update_idletasks()
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
-    def get_full_name(self, kegg_data, ncbi_name):
-        if 'ORTHOLOGY' in kegg_data:
-            ko_entry = kegg_data['ORTHOLOGY']
-            if '[' in ko_entry:
-                return ko_entry.split('[')[0].strip()
+    def add_section(self, title, lines):
+        section = tk.Frame(self.scrollable_frame, bg="#f9f9f9", bd=0, highlightbackground="#dddddd", highlightthickness=1)
+        section.pack(fill="x", pady=10, padx=10, ipady=10, ipadx=10)
 
-        if 'NAME' in kegg_data:
-            return kegg_data['NAME']
+        container = tk.Frame(section, bg="#f9f9f9")
+        container.pack(fill="x")
 
-        if 'DEFINITION' in kegg_data:
-            return kegg_data['DEFINITION']
+        tk.Label(container, text=title, font=self.header_font, bg="#f9f9f9", anchor="w").pack(fill="x", padx=10, pady=(5, 5))
+        for line in lines:
+            tk.Label(container, text=line, font=self.normal_font, bg="#f9f9f9", anchor="w", wraplength=700, justify="left").pack(fill="x", padx=20, pady=2)
 
-        return ncbi_name
+        return section
 
     def send_get_request(self, url_string):
         response = requests.get(url_string)
@@ -237,6 +181,14 @@ class GeneInfoApp:
 
         return result
 
+    def get_full_name(self, kegg_data, ncbi_name):
+        if 'ORTHOLOGY' in kegg_data:
+            ko_entry = kegg_data['ORTHOLOGY']
+            if '[' in ko_entry:
+                return ko_entry.split('[')[0].strip()
+
+        return kegg_data.get('NAME', kegg_data.get('DEFINITION', ncbi_name))
+
     def cauta_proteina(self, protein_name):
         url = "https://search.rcsb.org/rcsbsearch/v2/query"
 
@@ -261,18 +213,16 @@ class GeneInfoApp:
         }
 
         response = requests.post(url, json=query)
-
         if response.status_code == 200:
             data = response.json()
             try:
                 return data['result_set'][0]['identifier']
             except (IndexError, KeyError):
                 return "N/A"
-        else:
-            return "N/A"
+        return "N/A"
 
+    def show_embedded_structure(self, pdb_code):
+        url = f"https://www.rcsb.org/3d-view/{pdb_code}"
+        webview.create_window(f"3D Structure Viewer: {pdb_code}", url, width=900, height=700)
+        webview.start()
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = GeneInfoApp(root)
-    root.mainloop()
