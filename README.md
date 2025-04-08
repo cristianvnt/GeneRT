@@ -50,7 +50,7 @@
 1. **Clone the repository**
    ```
    git clone https://github.com/Mematoru23/PHv17.git
-   cd genert
+   cd PHv17
    ```
 
 2. **Create and activate a virtual environment**
