@@ -49,7 +49,7 @@
 
 1. **Clone the repository**
    ```
-   git clone https://github.com/yourusername/genert.git
+   git clone https://github.com/Mematoru23/PHv17.git
    cd genert
    ```
 
