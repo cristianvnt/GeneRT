@@ -26,7 +26,7 @@
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 - **Language:** Python
 - **UI:** Tkinter
@@ -39,4 +39,56 @@
 
 ---
 
+## Installation
 
+### Prerequisites
+- Python 3.8 or higher
+- Git
+
+### Setup Instructions
+
+1. **Clone the repository**
+   ```
+   git clone https://github.com/yourusername/genert.git
+   cd genert
+   ```
+
+2. **Create and activate a virtual environment**
+   
+   Windows:
+   ```
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+   
+   macOS/Linux:
+   ```
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Install dependencies**
+   ```
+   pip install -r requirements.txt
+   ```
+
+4. **Install additional packages separately**
+   
+   Some packages might not install correctly from requirements.txt:
+   ```
+   pip install PyQtWebEngine==5.15.7
+   pip install pyvis==0.3.2
+   ```
+
+5. **Run the application**
+   ```
+   python -m src.main
+   ```
+
+### Troubleshooting
+
+- If you encounter a `ModuleNotFoundError: No module named 'PyQt5.QtWebEngineWidgets'` error, make sure you've installed PyQtWebEngine as described in step 4.
+- For visualization issues, verify that pyvis is properly installed.
+- If using an IDE (like PyCharm or VS Code), ensure that it's using the correct virtual environment interpreter.
+
+---

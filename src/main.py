@@ -1,7 +1,7 @@
 import tkinter as tk
-from geneInfoFetching.GeneInfoFetcher import GeneInfoApp
-from clasa import DiseaseGeneApp1
-from disease_search.SimilarDiseases import DiseaseGeneApp
+from src.geneInfoFetching.GeneInfoFetcher import GeneInfoApp
+from src.clasa import DiseaseGeneApp1
+from src.disease_search.SimilarDiseases import DiseaseGeneApp
 
 
 def main():
